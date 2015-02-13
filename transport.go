@@ -87,14 +87,16 @@ func (t *transport) RoundTrip(req *http.Request) (*http.Response, error) {
 
 	for i := 0; i < int(t.Config.RequestRetry); i++ {
 		res, err = t.roundTrip(req)
-		if IsErrRequestTimeout(err) {
+		if err != nil {
 			continue
-		} else if err != nil {
-			return nil, err
+		}
+
+		if IsErr5XX(res.StatusCode) {
+			continue
 		}
 	}
 
-	return res, err
+	return res, Mask(err)
 }
 
 //------------------------------------------------------------------------------

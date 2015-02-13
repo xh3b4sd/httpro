@@ -108,7 +108,7 @@ var _ = Describe("httpro", func() {
 				})
 			})
 
-			Describe("request timeout route", func() {
+			Describe("request timeout client", func() {
 				BeforeEach(func() {
 					ts = newTestServer(testServerConfig{NoRequestTimeoutOnRetry: 3})
 					c := httpro.NewHTTPClient(httpro.Config{RequestTimeout: 50 * time.Millisecond})
@@ -126,7 +126,7 @@ var _ = Describe("httpro", func() {
 		})
 
 		Describe("request timed out and request retry", func() {
-			Describe("request timed out route", func() {
+			Describe("request timeout and retry client", func() {
 				BeforeEach(func() {
 					ts = newTestServer(testServerConfig{NoRequestTimeoutOnRetry: 3})
 					c := httpro.NewHTTPClient(httpro.Config{RequestTimeout: 50 * time.Millisecond, RequestRetry: 2})
@@ -146,6 +146,40 @@ var _ = Describe("httpro", func() {
 				BeforeEach(func() {
 					ts = newTestServer(testServerConfig{NoRequestTimeoutOnRetry: 3})
 					c := httpro.NewHTTPClient(httpro.Config{RequestTimeout: 50 * time.Millisecond, RequestRetry: 3})
+					res, err = c.Get(ts.URL)
+				})
+
+				It("should respond without error", func() {
+					Expect(err).To(BeNil())
+				})
+
+				It("should respond with status code 200", func() {
+					Expect(res.StatusCode).To(Equal(200))
+				})
+			})
+		})
+
+		Describe("error responses and request retry", func() {
+			Describe("default client", func() {
+				BeforeEach(func() {
+					ts = newTestServer(testServerConfig{StatusCode: 500, NoStatusCodeOnRetry: 3})
+					c := httpro.NewHTTPClient(httpro.Config{})
+					res, err = c.Get(ts.URL)
+				})
+
+				It("should respond without error", func() {
+					Expect(err).To(BeNil())
+				})
+
+				It("should respond with status code 500", func() {
+					Expect(res.StatusCode).To(Equal(500))
+				})
+			})
+
+			Describe("retry client", func() {
+				BeforeEach(func() {
+					ts = newTestServer(testServerConfig{StatusCode: 500, NoStatusCodeOnRetry: 3})
+					c := httpro.NewHTTPClient(httpro.Config{RequestRetry: 3})
 					res, err = c.Get(ts.URL)
 				})
 

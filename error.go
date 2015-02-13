@@ -21,6 +21,10 @@ func IsErrConnectTimeout(err error) bool {
 	return false
 }
 
+func IsErr5XX(statusCode int) bool {
+	return statusCode >= 500 && statusCode <= 599
+}
+
 func IsErrRequestTimeout(err error) bool {
 	errCause := errgo.Cause(err)
 

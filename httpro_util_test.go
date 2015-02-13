@@ -10,7 +10,9 @@ import (
 )
 
 type testServerConfig struct {
+	StatusCode              int
 	NoRequestTimeoutOnRetry uint
+	NoStatusCodeOnRetry     uint
 	NoConnectRefusedAfter   time.Duration
 }
 
@@ -42,6 +44,12 @@ func newTestServer(c testServerConfig) *testServer {
 	srv := &http.Server{
 		Handler: http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			reqCount++
+
+			if c.StatusCode > 0 && c.NoStatusCodeOnRetry > 0 && reqCount < int(c.NoStatusCodeOnRetry) {
+				w.WriteHeader(c.StatusCode)
+				fmt.Fprint(w, strconv.Itoa(c.StatusCode))
+				return
+			}
 
 			if c.NoRequestTimeoutOnRetry > 0 && reqCount < int(c.NoRequestTimeoutOnRetry) {
 				time.Sleep(100 * time.Millisecond)
