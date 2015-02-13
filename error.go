@@ -16,6 +16,7 @@ var (
 	Mask = errgo.MaskFunc(errgo.Any, IsErrConnectTimeout, IsErrRequestTimeout, IsErrConnectionRefused)
 )
 
+// TODO
 func IsErrConnectTimeout(err error) bool {
 	return false
 }
