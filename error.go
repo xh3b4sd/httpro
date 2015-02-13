@@ -13,7 +13,7 @@ var (
 	ErrConnectTimeout = errgo.New("connect timeout")
 	ErrRequestTimeout = errgo.New("request timeout")
 
-	Mask = errgo.MaskFunc(errgo.Any, IsErrConnectTimeout, IsErrRequestTimeout, IsErrConnectionRefused)
+	Mask = errgo.MaskFunc(IsErrConnectTimeout, IsErrRequestTimeout, IsErrConnectionRefused)
 )
 
 // TODO

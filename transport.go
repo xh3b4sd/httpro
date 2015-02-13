@@ -15,18 +15,29 @@ var (
 )
 
 type TransportConfig struct {
+	// ReconnectDelay describes the time the client should block before
+	// attempting to connect again. This configuration is used when the
+	// preceeding connection was refused.
 	ReconnectDelay time.Duration
+
+	// ConnectTimeout is the value used to configure the call to net.DialTimeout.
 	ConnectTimeout time.Duration
+
+	// RequestTimeout describes the time within a request needs to be processed
+	// before it is canceled.
 	RequestTimeout time.Duration
 
+	// RequestRetry describes the number of retries the client will do in case a
+	// request timed out or received a 5XX status code.
 	RequestRetry uint
 }
 
-type transport struct {
+type Transport struct {
 	Config           TransportConfig
 	defaultTransport *http.Transport
 }
 
+// NewTransport creates a new *http.Transport that implements http.RoundTripper.
 func NewTransport(c TransportConfig) http.RoundTripper {
 	if c.ReconnectDelay == 0 {
 		c.ReconnectDelay = defaultReconnectDelay
@@ -44,7 +55,7 @@ func NewTransport(c TransportConfig) http.RoundTripper {
 		c.RequestRetry = defaultRequestRetry
 	}
 
-	t := &transport{
+	t := &Transport{
 		Config: c,
 	}
 
@@ -73,15 +84,15 @@ func NewTransport(c TransportConfig) http.RoundTripper {
 	return t
 }
 
-func (t *transport) CancelRequest(req *http.Request) {
+func (t *Transport) CancelRequest(req *http.Request) {
 	t.defaultTransport.CancelRequest(req)
 }
 
-func (t *transport) CloseIdleConnections() {
+func (t *Transport) CloseIdleConnections() {
 	t.defaultTransport.CloseIdleConnections()
 }
 
-func (t *transport) RoundTrip(req *http.Request) (*http.Response, error) {
+func (t *Transport) RoundTrip(req *http.Request) (*http.Response, error) {
 	var err error
 	var res *http.Response
 
@@ -102,7 +113,7 @@ func (t *transport) RoundTrip(req *http.Request) (*http.Response, error) {
 //------------------------------------------------------------------------------
 // private
 
-func (t *transport) roundTrip(req *http.Request) (*http.Response, error) {
+func (t *Transport) roundTrip(req *http.Request) (*http.Response, error) {
 	ctx := &context{
 		req: req,
 	}
@@ -134,7 +145,7 @@ func (t *transport) roundTrip(req *http.Request) (*http.Response, error) {
 	return ctx.res, nil
 }
 
-func (t *transport) preResHandler(ctx *context) error {
+func (t *Transport) preResHandler(ctx *context) error {
 	ctx.timer = time.AfterFunc(t.Config.RequestTimeout, func() {
 		ctx.requestTimedOut = true
 		t.defaultTransport.CancelRequest(ctx.req)
@@ -143,7 +154,7 @@ func (t *transport) preResHandler(ctx *context) error {
 	return nil
 }
 
-func (t *transport) postResHandler(ctx *context) error {
+func (t *Transport) postResHandler(ctx *context) error {
 	if ctx.requestTimedOut {
 		ctx.res.Body = &bodyCloser{ReadCloser: ctx.res.Body, timer: ctx.timer}
 	}

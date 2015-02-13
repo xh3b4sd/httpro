@@ -24,18 +24,17 @@ type Config struct {
 	RequestRetry uint
 }
 
+// NewHTTPClient creates a new *http.Client.
 //
-//  ...
-//  c := httpro.NewHTTPClient(httpro.Config{
-//    ReconnectDelay: 500 * time.Millisecond,
-//    ConnectTimeout: 500 * time.Millisecond,
-//    RequestTimeout: 500 * time.Millisecond,
+//   c := httpro.NewHTTPClient(httpro.Config{
+//     ReconnectDelay: 500 * time.Millisecond,
+//     ConnectTimeout: 500 * time.Millisecond,
+//     RequestTimeout: 500 * time.Millisecond,
 //
-//    RequestRetry: 5,
-//  })
+//     RequestRetry: 5,
+//   })
 //
-//  res, err = c.Get("https://google.com/")
-//  ...
+//   res, err = c.Get("https://google.com/")
 //
 func NewHTTPClient(c Config) *http.Client {
 	httpClient := &http.Client{
