@@ -6,9 +6,11 @@ import (
 )
 
 type Config struct {
-	RequestTimeout time.Duration
+	ReconnectDelay time.Duration
 	ConnectTimeout time.Duration
-	RequestRetry   uint
+	RequestTimeout time.Duration
+
+	RequestRetry uint
 }
 
 type Client struct {
@@ -19,9 +21,11 @@ type Client struct {
 func NewHTTPClient(c Config) *http.Client {
 	httpClient := &http.Client{
 		Transport: NewTransport(TransportConfig{
-			RequestTimeout: c.RequestTimeout,
+			ReconnectDelay: c.ReconnectDelay,
 			ConnectTimeout: c.ConnectTimeout,
-			RequestRetry:   c.RequestRetry,
+			RequestTimeout: c.RequestTimeout,
+
+			RequestRetry: c.RequestRetry,
 		}),
 	}
 

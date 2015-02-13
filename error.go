@@ -9,10 +9,11 @@ import (
 )
 
 var (
+	ErrConnectRefused = errgo.New("connect refused")
 	ErrConnectTimeout = errgo.New("connect timeout")
 	ErrRequestTimeout = errgo.New("request timeout")
 
-	Mask = errgo.MaskFunc(IsErrConnectTimeout, IsErrRequestTimeout, IsErrConnectionRefused)
+	Mask = errgo.MaskFunc(errgo.Any, IsErrConnectTimeout, IsErrRequestTimeout, IsErrConnectionRefused)
 )
 
 func IsErrConnectTimeout(err error) bool {
@@ -26,14 +27,20 @@ func IsErrRequestTimeout(err error) bool {
 		return errgo.Cause(urlErr.Err) == ErrRequestTimeout
 	}
 
-	return errgo.Cause(errCause) == ErrRequestTimeout
+	return errCause == ErrRequestTimeout
 }
 
 func IsErrConnectionRefused(err error) bool {
 	errCause := errgo.Cause(err)
 
 	if urlErr, ok := errCause.(*url.Error); ok {
-		if opErr, ok := urlErr.Err.(*net.OpError); ok {
+		urlErrCause := errgo.Cause(urlErr.Err)
+
+		if urlErrCause == ErrConnectRefused {
+			return true
+		}
+
+		if opErr, ok := urlErrCause.(*net.OpError); ok {
 			if errno, ok := opErr.Err.(syscall.Errno); ok {
 				if errno == syscall.ECONNREFUSED {
 					return true
@@ -42,5 +49,19 @@ func IsErrConnectionRefused(err error) bool {
 		}
 	}
 
-	return false
+	if opErr, ok := errCause.(*net.OpError); ok {
+		opErrCause := errgo.Cause(opErr.Err)
+
+		if opErrCause == ErrConnectRefused {
+			return true
+		}
+
+		if errno, ok := opErrCause.(syscall.Errno); ok {
+			if errno == syscall.ECONNREFUSED {
+				return true
+			}
+		}
+	}
+
+	return errCause == ErrConnectRefused
 }

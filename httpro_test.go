@@ -1,9 +1,7 @@
 package httpro_test
 
 import (
-	"fmt"
 	"net/http"
-	"net/http/httptest"
 	"testing"
 	"time"
 
@@ -18,32 +16,11 @@ func TestHTTPro(t *testing.T) {
 	RunSpecs(t, "httpro")
 }
 
-type testServerConfig struct {
-	NoRequestTimeoutOnRetry uint
-	NoConnectTimeoutAfter   time.Duration
-}
-
-func testServerWithRequestTimeout(c testServerConfig) *httptest.Server {
-	reqCount := 0
-
-	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		reqCount++
-
-		if reqCount < int(c.NoRequestTimeoutOnRetry) {
-			time.Sleep(100 * time.Millisecond)
-		}
-
-		fmt.Fprint(w, "OK")
-	}))
-
-	return ts
-}
-
 var _ = Describe("httpro", func() {
 	var (
 		err error
 		res *http.Response
-		ts  *httptest.Server
+		ts  *testServer
 	)
 
 	BeforeEach(func() {
@@ -62,29 +39,10 @@ var _ = Describe("httpro", func() {
 	})
 
 	Describe("GET", func() {
-		Describe("default client", func() {
-			Describe("standard route", func() {
+		Describe("standard route", func() {
+			Describe("default client", func() {
 				BeforeEach(func() {
-					ts = httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-						fmt.Fprint(w, "OK")
-					}))
-
-					c := httpro.NewHTTPClient(httpro.Config{})
-					res, err = c.Get(ts.URL)
-				})
-
-				It("should respond without error", func() {
-					Expect(err).To(BeNil())
-				})
-
-				It("should respond with status code 200", func() {
-					Expect(res.StatusCode).To(Equal(200))
-				})
-			})
-
-			Describe("request-timeout route", func() {
-				BeforeEach(func() {
-					ts = testServerWithRequestTimeout(testServerConfig{NoRequestTimeoutOnRetry: 3})
+					ts = newTestServer(testServerConfig{})
 					c := httpro.NewHTTPClient(httpro.Config{})
 					res, err = c.Get(ts.URL)
 				})
@@ -99,10 +57,60 @@ var _ = Describe("httpro", func() {
 			})
 		})
 
-		Describe("request-timeout client", func() {
-			Describe("request-timeout route", func() {
+		Describe("connection refused", func() {
+			Describe("default client", func() {
 				BeforeEach(func() {
-					ts = testServerWithRequestTimeout(testServerConfig{NoRequestTimeoutOnRetry: 3})
+					ts = newTestServer(testServerConfig{NoConnectRefusedAfter: 300 * time.Millisecond})
+					c := httpro.NewHTTPClient(httpro.Config{})
+					res, err = c.Get(ts.URL)
+				})
+
+				It("should respond with connect refused error", func() {
+					Expect(httpro.IsErrConnectionRefused(err)).To(BeTrue())
+				})
+
+				It("should respond empty", func() {
+					Expect(res).To(BeNil())
+				})
+			})
+
+			Describe("reconnect delay client", func() {
+				BeforeEach(func() {
+					ts = newTestServer(testServerConfig{NoConnectRefusedAfter: 300 * time.Millisecond})
+					c := httpro.NewHTTPClient(httpro.Config{ReconnectDelay: 400 * time.Millisecond})
+					res, err = c.Get(ts.URL)
+				})
+
+				It("should respond without error", func() {
+					Expect(err).To(BeNil())
+				})
+
+				It("should respond with status code 200", func() {
+					Expect(res.StatusCode).To(Equal(200))
+				})
+			})
+		})
+
+		Describe("request timed out", func() {
+			Describe("default client", func() {
+				BeforeEach(func() {
+					ts = newTestServer(testServerConfig{NoRequestTimeoutOnRetry: 3})
+					c := httpro.NewHTTPClient(httpro.Config{})
+					res, err = c.Get(ts.URL)
+				})
+
+				It("should respond without error", func() {
+					Expect(err).To(BeNil())
+				})
+
+				It("should respond with status code 200", func() {
+					Expect(res.StatusCode).To(Equal(200))
+				})
+			})
+
+			Describe("request timeout route", func() {
+				BeforeEach(func() {
+					ts = newTestServer(testServerConfig{NoRequestTimeoutOnRetry: 3})
 					c := httpro.NewHTTPClient(httpro.Config{RequestTimeout: 50 * time.Millisecond})
 					res, err = c.Get(ts.URL)
 				})
@@ -117,10 +125,10 @@ var _ = Describe("httpro", func() {
 			})
 		})
 
-		Describe("request-timeout and request-retry client", func() {
-			Describe("request-timeout route", func() {
+		Describe("request timed out and request retry", func() {
+			Describe("request timed out route", func() {
 				BeforeEach(func() {
-					ts = testServerWithRequestTimeout(testServerConfig{NoRequestTimeoutOnRetry: 3})
+					ts = newTestServer(testServerConfig{NoRequestTimeoutOnRetry: 3})
 					c := httpro.NewHTTPClient(httpro.Config{RequestTimeout: 50 * time.Millisecond, RequestRetry: 2})
 					res, err = c.Get(ts.URL)
 				})
@@ -134,9 +142,9 @@ var _ = Describe("httpro", func() {
 				})
 			})
 
-			Describe("request-timeout route; enough retries", func() {
+			Describe("request timed out route; enough retries", func() {
 				BeforeEach(func() {
-					ts = testServerWithRequestTimeout(testServerConfig{NoRequestTimeoutOnRetry: 3})
+					ts = newTestServer(testServerConfig{NoRequestTimeoutOnRetry: 3})
 					c := httpro.NewHTTPClient(httpro.Config{RequestTimeout: 50 * time.Millisecond, RequestRetry: 3})
 					res, err = c.Get(ts.URL)
 				})

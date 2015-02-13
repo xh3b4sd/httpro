@@ -9,13 +9,17 @@ import (
 var (
 	defaultRequestTimeout = 30 * time.Second
 	defaultConnectTimeout = 30 * time.Second
+	defaultReconnectDelay = 200 * time.Millisecond
+	defaultConnectRetry   = uint(2)
 	defaultRequestRetry   = uint(1)
 )
 
 type TransportConfig struct {
-	RequestTimeout time.Duration
+	ReconnectDelay time.Duration
 	ConnectTimeout time.Duration
-	RequestRetry   uint
+	RequestTimeout time.Duration
+
+	RequestRetry uint
 }
 
 type transport struct {
@@ -24,6 +28,10 @@ type transport struct {
 }
 
 func NewTransport(c TransportConfig) http.RoundTripper {
+	if c.ReconnectDelay == 0 {
+		c.ReconnectDelay = defaultReconnectDelay
+	}
+
 	if c.ConnectTimeout == 0 {
 		c.ConnectTimeout = defaultConnectTimeout
 	}
@@ -44,8 +52,21 @@ func NewTransport(c TransportConfig) http.RoundTripper {
 		t.defaultTransport = defaultTransport
 
 		t.defaultTransport.Dial = func(network, addr string) (net.Conn, error) {
-			conn, err := net.DialTimeout(network, addr, t.Config.ConnectTimeout)
-			return conn, err
+			var err error
+			var conn net.Conn
+
+			for i := 0; i < int(defaultConnectRetry); i++ {
+				conn, err = net.DialTimeout(network, addr, t.Config.ConnectTimeout)
+
+				if IsErrConnectionRefused(err) {
+					time.Sleep(t.Config.ReconnectDelay)
+					continue
+				} else if err != nil {
+					return nil, Mask(err)
+				}
+			}
+
+			return conn, Mask(err)
 		}
 	}
 
