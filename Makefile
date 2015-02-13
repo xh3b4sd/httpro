@@ -38,7 +38,6 @@ deps:
 	@# Build test packages (we only want those two, so we use `-d` in go get)
 	@GOPATH=$(BUILD_PATH) go get -d -v github.com/onsi/gomega
 	@GOPATH=$(BUILD_PATH) go get -d -v github.com/onsi/ginkgo
-	@GOPATH=$(BUILD_PATH) go get -d -v github.com/giantswarm/httptest-helper
 
 $(PROJECT): VERSION $(SOURCE)
 	@echo Building for $(GOOS)/$(GOARCH)
