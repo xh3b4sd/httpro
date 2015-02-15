@@ -114,23 +114,6 @@ func (b *Breaker) trackState() {
 	for {
 		time.Sleep(defaultSampleTTL)
 
-		if len(b.samples) < defaultMinSampleVol {
-			continue
-		}
-
-		if err := b.accept(); err != nil {
-			time.Sleep(b.Config.BreakTTL)
-		}
-
-		// calculate concurrent actions
-		b.state.concurrentActions = b.currentSample().concurrentActions
-
-		// calculate error rate
-		b.state.errorRate = b.calculateErrorRate()
-
-		// calculate performance loss
-		b.state.performanceLoss = b.calculatePerformanceLoss()
-
 		// add new sample
 		b.samples = append(b.samples, &sample{})
 
@@ -139,13 +122,29 @@ func (b *Breaker) trackState() {
 			b.samples = b.samples[1:len(b.samples)]
 		}
 
-		fmt.Printf("%#v\n", "breaker state")
-		fmt.Printf("%#v\n", b.state)
-		fmt.Printf("%#v\n", "")
+		if len(b.samples) < defaultMinSampleVol {
+			continue
+		}
 
-		fmt.Printf("%#v\n", "breaker samples")
-		fmt.Printf("%#v\n", b.samples)
-		fmt.Printf("%#v\n", "")
+		if err := b.accept(); err != nil {
+			fmt.Printf("%s, waiting for %s\n", err.Error(), b.Config.BreakTTL.String())
+			time.Sleep(b.Config.BreakTTL)
+		}
+
+		cs := b.currentSample()
+
+		// calculate concurrent actions
+		b.state.concurrentActions = cs.concurrentActions
+
+		// calculate error rate
+		b.state.errorRate = b.calculateErrorRate()
+
+		// calculate performance loss
+		b.state.performanceLoss = b.calculatePerformanceLoss()
+
+		// TODO proper configurable logging
+		fmt.Printf("breaker state: %+v\n", b.state)
+		fmt.Printf("currently obtaining %d samples\n", len(b.samples))
 	}
 }
 
@@ -171,7 +170,11 @@ func (b *Breaker) currentSample() *sample {
 
 func (b *Breaker) calculatePerformanceLoss() int64 {
 	histPerfAvg := calculatePerformanceAvg(b.samples[:len(b.samples)-1])
-	currPerfAvg := calculatePerformanceAvg(b.samples[len(b.samples)-1:])
+	currPerfAvg := calculatePerformanceAvg(b.samples[len(b.samples)-2 : len(b.samples)-1])
+
+	if histPerfAvg == 0 || currPerfAvg == 0 {
+		return 0
+	}
 
 	currPerfLost := (currPerfAvg * 100 / histPerfAvg) - 100
 
@@ -186,7 +189,12 @@ func (b *Breaker) calculateErrorRate() int64 {
 		totalActions += s.totalActions
 		totalFailures += s.totalFailures
 	}
-	currErrorRate := (totalFailures * 100 / totalActions) - 100
+
+	if totalActions == 0 || totalFailures == 0 {
+		return 0
+	}
+
+	currErrorRate := totalFailures * 100 / totalActions
 
 	return currErrorRate
 }
@@ -201,6 +209,10 @@ func calculatePerformanceAvg(ss []*sample) int64 {
 		for _, p := range s.performances {
 			performanceSum += p
 		}
+	}
+
+	if performanceCount == 0 || performanceSum == 0 {
+		return 0
 	}
 
 	performanceAvg := performanceSum / performanceCount
