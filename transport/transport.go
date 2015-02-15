@@ -1,9 +1,11 @@
-package httpro
+package transport
 
 import (
 	"net"
 	"net/http"
 	"time"
+
+	"github.com/zyndiecate/httpro/breaker"
 )
 
 var (
@@ -14,7 +16,7 @@ var (
 	defaultRequestRetry   = uint(1)
 )
 
-type TransportConfig struct {
+type Config struct {
 	// ReconnectDelay describes the time the client should block before
 	// attempting to connect again. This configuration is used when the
 	// preceeding connection was refused.
@@ -30,15 +32,20 @@ type TransportConfig struct {
 	// RequestRetry describes the number of retries the client will do in case a
 	// request timed out or received a 5XX status code.
 	RequestRetry uint
+
+	// BreakerConfig is used to configure the breaker internally used as circuit
+	// breaker.
+	BreakerConfig breaker.Config
 }
 
 type Transport struct {
-	Config           TransportConfig
+	Config           Config
+	Breaker          *breaker.Breaker
 	defaultTransport *http.Transport
 }
 
 // NewTransport creates a new *http.Transport that implements http.RoundTripper.
-func NewTransport(c TransportConfig) http.RoundTripper {
+func NewTransport(c Config) http.RoundTripper {
 	if c.ReconnectDelay == 0 {
 		c.ReconnectDelay = defaultReconnectDelay
 	}
@@ -56,7 +63,8 @@ func NewTransport(c TransportConfig) http.RoundTripper {
 	}
 
 	t := &Transport{
-		Config: c,
+		Config:  c,
+		Breaker: breaker.NewBreaker(c.BreakerConfig),
 	}
 
 	if defaultTransport, ok := http.DefaultTransport.(*http.Transport); ok {
@@ -69,7 +77,7 @@ func NewTransport(c TransportConfig) http.RoundTripper {
 			for i := 0; i < int(defaultConnectRetry); i++ {
 				conn, err = net.DialTimeout(network, addr, t.Config.ConnectTimeout)
 
-				if IsErrConnectionRefused(err) {
+				if IsErrConnectRefused(err) {
 					time.Sleep(t.Config.ReconnectDelay)
 					continue
 				} else if err != nil {
@@ -96,15 +104,32 @@ func (t *Transport) RoundTrip(req *http.Request) (*http.Response, error) {
 	var err error
 	var res *http.Response
 
-	for i := 0; i < int(t.Config.RequestRetry); i++ {
-		res, err = t.roundTrip(req)
-		if err != nil {
-			continue
+	err = t.Breaker.Run(func() error {
+		for i := 0; i < int(t.Config.RequestRetry); i++ {
+			err = nil
+
+			res, err = t.roundTrip(req)
+			if err != nil {
+				continue
+			}
+
+			if isStatusCode5XX(res.StatusCode) {
+				// We just want to track 5XX errors for the breaker. Later we must
+				// reset this error.
+				err = Err5XX
+				continue
+			}
 		}
 
-		if IsErr5XX(res.StatusCode) {
-			continue
-		}
+		return Mask(err)
+	})
+
+	// Because we just want to track 5XX errors for the breaker, we reset those
+	// errors here. Otherwise the roundtripper would not be able to handle the
+	// response properly. In case the roundtripper replies both, a response and
+	// an error, the response will be ignored.
+	if IsErr5XX(err) {
+		err = nil
 	}
 
 	return res, Mask(err)

@@ -1,4 +1,4 @@
-package httpro
+package transport
 
 import (
 	"io"
@@ -28,4 +28,8 @@ type bodyCloser struct {
 func (bc *bodyCloser) Close() error {
 	bc.timer.Stop()
 	return bc.ReadCloser.Close()
+}
+
+func isStatusCode5XX(statusCode int) bool {
+	return statusCode >= 500 && statusCode <= 599
 }

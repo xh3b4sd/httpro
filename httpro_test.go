@@ -8,7 +8,8 @@ import (
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 
-	"github.com/giantswarm/httpro"
+	"github.com/zyndiecate/httpro"
+	"github.com/zyndiecate/httpro/transport"
 )
 
 func TestHTTPro(t *testing.T) {
@@ -66,7 +67,7 @@ var _ = Describe("httpro", func() {
 				})
 
 				It("should respond with connect refused error", func() {
-					Expect(httpro.IsErrConnectionRefused(err)).To(BeTrue())
+					Expect(transport.IsErrConnectRefused(err)).To(BeTrue())
 				})
 
 				It("should respond empty", func() {
@@ -116,7 +117,7 @@ var _ = Describe("httpro", func() {
 				})
 
 				It("should respond with timeout error", func() {
-					Expect(httpro.IsErrRequestTimeout(err)).To(BeTrue())
+					Expect(transport.IsErrRequestTimeout(err)).To(BeTrue())
 				})
 
 				It("should respond empty", func() {
@@ -134,7 +135,7 @@ var _ = Describe("httpro", func() {
 				})
 
 				It("should respond with timeout error", func() {
-					Expect(httpro.IsErrRequestTimeout(err)).To(BeTrue())
+					Expect(transport.IsErrRequestTimeout(err)).To(BeTrue())
 				})
 
 				It("should respond empty", func() {

@@ -1,4 +1,4 @@
-package httpro
+package transport
 
 import (
 	"net"
@@ -12,17 +12,19 @@ var (
 	ErrConnectRefused = errgo.New("connect refused")
 	ErrConnectTimeout = errgo.New("connect timeout")
 	ErrRequestTimeout = errgo.New("request timeout")
+	Err5XX            = errgo.New("error 5XX")
 
-	Mask = errgo.MaskFunc(IsErrConnectTimeout, IsErrRequestTimeout, IsErrConnectionRefused)
+	Mask = errgo.MaskFunc(
+		IsErrConnectTimeout,
+		IsErrRequestTimeout,
+		IsErrConnectRefused,
+		IsErr5XX,
+	)
 )
 
 // TODO
 func IsErrConnectTimeout(err error) bool {
 	return false
-}
-
-func IsErr5XX(statusCode int) bool {
-	return statusCode >= 500 && statusCode <= 599
 }
 
 func IsErrRequestTimeout(err error) bool {
@@ -35,7 +37,7 @@ func IsErrRequestTimeout(err error) bool {
 	return errCause == ErrRequestTimeout
 }
 
-func IsErrConnectionRefused(err error) bool {
+func IsErrConnectRefused(err error) bool {
 	errCause := errgo.Cause(err)
 
 	if urlErr, ok := errCause.(*url.Error); ok {
@@ -69,4 +71,8 @@ func IsErrConnectionRefused(err error) bool {
 	}
 
 	return errCause == ErrConnectRefused
+}
+
+func IsErr5XX(err error) bool {
+	return errgo.Cause(err) == Err5XX
 }

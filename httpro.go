@@ -3,6 +3,9 @@ package httpro
 import (
 	"net/http"
 	"time"
+
+	"github.com/zyndiecate/httpro/breaker"
+	"github.com/zyndiecate/httpro/transport"
 )
 
 // Config to configure the HTTP client.
@@ -22,6 +25,10 @@ type Config struct {
 	// RequestRetry describes the number of retries the client will do in case a
 	// request timed out or received a 5XX status code.
 	RequestRetry uint
+
+	// BreakerConfig is used to configure the breaker internally used as circuit
+	// breaker.
+	BreakerConfig breaker.Config
 }
 
 // NewHTTPClient creates a new *http.Client.
@@ -38,12 +45,14 @@ type Config struct {
 //
 func NewHTTPClient(c Config) *http.Client {
 	httpClient := &http.Client{
-		Transport: NewTransport(TransportConfig{
+		Transport: transport.NewTransport(transport.Config{
 			ReconnectDelay: c.ReconnectDelay,
 			ConnectTimeout: c.ConnectTimeout,
 			RequestTimeout: c.RequestTimeout,
 
 			RequestRetry: c.RequestRetry,
+
+			BreakerConfig: c.BreakerConfig,
 		}),
 	}
 

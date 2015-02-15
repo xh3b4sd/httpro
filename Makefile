@@ -1,6 +1,6 @@
 PROJECT := httpro
 BUILD_PATH := $(shell pwd)/.gobuild
-GS_PATH := $(BUILD_PATH)/src/github.com/giantswarm
+PROJECT_PATH := $(BUILD_PATH)/src/github.com/zyndiecate
 SOURCE := $(shell find . -name '*.go')
 TEMPLATES := $(shell find . -name '*.tmpl')
 
@@ -24,15 +24,15 @@ deps:
 	@${MAKE} -B -s .gobuild
 
 .gobuild:
-	@mkdir -p $(GS_PATH)
-	@rm -f $(GS_PATH)/$(PROJECT) && cd "$(GS_PATH)" && ln -s ../../../.. $(PROJECT)
+	@mkdir -p $(PROJECT_PATH)
+	@rm -f $(PROJECT_PATH)/$(PROJECT) && cd "$(PROJECT_PATH)" && ln -s ../../../.. $(PROJECT)
 
 	@#
 	@# Fetch private packages first (so `go get` skips them later)
 
 	@#
 	@# Fetch public dependencies via `go get`
-	@GOPATH=$(BUILD_PATH) go get -d -v github.com/giantswarm/$(PROJECT)
+	@GOPATH=$(BUILD_PATH) go get -d -v github.com/zyndiecate/$(PROJECT)
 
 	@#
 	@# Build test packages (we only want those two, so we use `-d` in go get)
