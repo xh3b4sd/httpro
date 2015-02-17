@@ -29,6 +29,10 @@ type Config struct {
 	// before it is canceled.
 	RequestTimeout time.Duration
 
+	// ConnectRetry describes the number of retries the client will do in case a
+	// connection was refused.
+	ConnectRetry uint
+
 	// RequestRetry describes the number of retries the client will do in case a
 	// request timed out or received a 5XX status code.
 	RequestRetry uint
@@ -58,6 +62,10 @@ func NewTransport(c Config) http.RoundTripper {
 		c.RequestTimeout = defaultRequestTimeout
 	}
 
+	if c.ConnectRetry == 0 {
+		c.ConnectRetry = defaultConnectRetry
+	}
+
 	if c.RequestRetry == 0 {
 		c.RequestRetry = defaultRequestRetry
 	}
@@ -70,23 +78,7 @@ func NewTransport(c Config) http.RoundTripper {
 	if defaultTransport, ok := http.DefaultTransport.(*http.Transport); ok {
 		t.defaultTransport = defaultTransport
 
-		t.defaultTransport.Dial = func(network, addr string) (net.Conn, error) {
-			var err error
-			var conn net.Conn
-
-			for i := 0; i < int(defaultConnectRetry); i++ {
-				conn, err = net.DialTimeout(network, addr, t.Config.ConnectTimeout)
-
-				if IsErrConnectRefused(err) {
-					time.Sleep(t.Config.ReconnectDelay)
-					continue
-				} else if err != nil {
-					return nil, Mask(err)
-				}
-			}
-
-			return conn, Mask(err)
-		}
+		t.defaultTransport.Dial = t.DialFunc
 	}
 
 	return t
@@ -133,6 +125,24 @@ func (t *Transport) RoundTrip(req *http.Request) (*http.Response, error) {
 	}
 
 	return res, Mask(err)
+}
+
+func (t *Transport) DialFunc(network, addr string) (net.Conn, error) {
+	var err error
+	var conn net.Conn
+
+	for i := 0; i < int(t.Config.ConnectRetry); i++ {
+		conn, err = net.DialTimeout(network, addr, t.Config.ConnectTimeout)
+
+		if IsErrConnectRefused(err) {
+			time.Sleep(t.Config.ReconnectDelay)
+			continue
+		} else if err != nil {
+			return nil, Mask(err)
+		}
+	}
+
+	return conn, Mask(err)
 }
 
 //------------------------------------------------------------------------------

@@ -22,6 +22,10 @@ type Config struct {
 	// before it is canceled.
 	RequestTimeout time.Duration
 
+	// ConnectRetry describes the number of retries the client will do in case a
+	// connection was refused.
+	ConnectRetry uint
+
 	// RequestRetry describes the number of retries the client will do in case a
 	// request timed out or received a 5XX status code.
 	RequestRetry uint
