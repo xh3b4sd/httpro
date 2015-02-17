@@ -1,18 +1,27 @@
 package breaker
 
 import (
+	"sync"
 	"sync/atomic"
 	"time"
 )
 
+type sampleConfig struct {
+	mutex *sync.Mutex
+}
+
 type sample struct {
+	sampleConfig
+
 	concurrentActions int64
 	totalActions      int64
 	totalFailures     int64
 	performances      []int64
 }
 
-// TODO newSample(sync.mutex)
+func newSample(c sampleConfig) *sample {
+	return &sample{sampleConfig: c}
+}
 
 func (s *sample) actionStart() int64 {
 	s.totalActions = atomic.AddInt64(&s.totalActions, 1)
@@ -35,7 +44,7 @@ func (s *sample) actionFailure() int64 {
 }
 
 func (s *sample) actionPerformance(actionStart, actionEnd int64) {
-	// TODO lock
+	s.mutex.Lock()
 	s.performances = append(s.performances, actionEnd-actionStart)
-	// TODO unlock
+	s.mutex.Unlock()
 }

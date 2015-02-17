@@ -2,6 +2,7 @@ package breaker
 
 import (
 	"fmt"
+	"sync"
 	"time"
 )
 
@@ -43,6 +44,7 @@ type state struct {
 type Breaker struct {
 	Config  Config
 	state   state
+	mutex   *sync.Mutex
 	samples []*sample
 }
 
@@ -64,10 +66,9 @@ func NewBreaker(c Config) *Breaker {
 	}
 
 	b := &Breaker{
-		Config: c,
-		samples: []*sample{
-			&sample{},
-		},
+		Config:  c,
+		mutex:   &sync.Mutex{},
+		samples: []*sample{},
 	}
 
 	go b.trackState()
@@ -110,12 +111,16 @@ func (b *Breaker) Run(action func() error) error {
 //------------------------------------------------------------------------------
 // private
 
+func (b *Breaker) newSample() *sample {
+	return newSample(sampleConfig{mutex: b.mutex})
+}
+
 func (b *Breaker) trackState() {
 	for {
 		time.Sleep(defaultSampleTTL)
 
 		// add new sample
-		b.samples = append(b.samples, &sample{})
+		b.samples = append(b.samples, b.newSample())
 
 		// remove old sample
 		if len(b.samples) > defaultMinSampleVol {
@@ -165,6 +170,10 @@ func (b *Breaker) accept() error {
 }
 
 func (b *Breaker) currentSample() *sample {
+	if len(b.samples) == 0 {
+		return b.newSample()
+	}
+
 	return b.samples[len(b.samples)-1]
 }
 
