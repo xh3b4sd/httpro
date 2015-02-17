@@ -108,7 +108,7 @@ func (t *Transport) RoundTrip(req *http.Request) (*http.Response, error) {
 			if isStatusCode5XX(res.StatusCode) {
 				// We just want to track 5XX errors for the breaker. Later we must
 				// reset this error.
-				err = Err5XX
+				err = ErrStatusCode5XX
 				continue
 			}
 		}
@@ -120,7 +120,7 @@ func (t *Transport) RoundTrip(req *http.Request) (*http.Response, error) {
 	// errors here. Otherwise the roundtripper would not be able to handle the
 	// response properly. In case the roundtripper replies both, a response and
 	// an error, the response will be ignored.
-	if IsErr5XX(err) {
+	if IsErrStatusCode5XX(err) {
 		err = nil
 	}
 

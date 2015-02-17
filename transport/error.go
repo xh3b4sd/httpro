@@ -12,13 +12,13 @@ var (
 	ErrConnectRefused = errgo.New("connect refused")
 	ErrConnectTimeout = errgo.New("connect timeout")
 	ErrRequestTimeout = errgo.New("request timeout")
-	Err5XX            = errgo.New("error 5XX")
+	ErrStatusCode5XX  = errgo.New("error status code 5XX")
 
 	Mask = errgo.MaskFunc(
 		IsErrConnectTimeout,
 		IsErrRequestTimeout,
 		IsErrConnectRefused,
-		IsErr5XX,
+		IsErrStatusCode5XX,
 	)
 )
 
@@ -73,6 +73,6 @@ func IsErrConnectRefused(err error) bool {
 	return errCause == ErrConnectRefused
 }
 
-func IsErr5XX(err error) bool {
-	return errgo.Cause(err) == Err5XX
+func IsErrStatusCode5XX(err error) bool {
+	return errgo.Cause(err) == ErrStatusCode5XX
 }
