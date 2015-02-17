@@ -5,7 +5,9 @@ import (
 	"net/http"
 	"time"
 
+	"github.com/op/go-logging"
 	"github.com/zyndiecate/httpro/breaker"
+	"github.com/zyndiecate/httpro/logger"
 )
 
 var (
@@ -40,12 +42,18 @@ type Config struct {
 	// BreakerConfig is used to configure the breaker internally used as circuit
 	// breaker.
 	BreakerConfig breaker.Config
+
+	// LogLevel defines the log level used to log process information. If none is
+	// given, logging is disabled. See
+	// https://godoc.org/github.com/op/go-logging#Level.
+	LogLevel string
 }
 
 type Transport struct {
 	Config           Config
 	Breaker          *breaker.Breaker
 	defaultTransport *http.Transport
+	logger           *logging.Logger
 }
 
 // NewTransport creates a new *http.Transport that implements http.RoundTripper.
@@ -70,9 +78,14 @@ func NewTransport(c Config) http.RoundTripper {
 		c.RequestRetry = defaultRequestRetry
 	}
 
+	if c.BreakerConfig.LogLevel == "" {
+		c.BreakerConfig.LogLevel = c.LogLevel
+	}
+
 	t := &Transport{
 		Config:  c,
 		Breaker: breaker.NewBreaker(c.BreakerConfig),
+		logger:  logger.NewLogger(logger.Config{Name: "transport", Level: c.LogLevel}),
 	}
 
 	if defaultTransport, ok := http.DefaultTransport.(*http.Transport); ok {
@@ -80,6 +93,8 @@ func NewTransport(c Config) http.RoundTripper {
 
 		t.defaultTransport.Dial = t.DialFunc
 	}
+
+	t.logger.Debug("created http transport with config: %#v", c)
 
 	return t
 }
@@ -111,6 +126,8 @@ func (t *Transport) RoundTrip(req *http.Request) (*http.Response, error) {
 				err = ErrStatusCode5XX
 				continue
 			}
+
+			t.logger.Info("retry request to %s", req.URL.String())
 		}
 
 		return Mask(err)
@@ -136,6 +153,7 @@ func (t *Transport) DialFunc(network, addr string) (net.Conn, error) {
 
 		if IsErrConnectRefused(err) {
 			time.Sleep(t.Config.ReconnectDelay)
+			t.logger.Info("retry connection to %s", addr)
 			continue
 		} else if err != nil {
 			return nil, Mask(err)
@@ -184,6 +202,7 @@ func (t *Transport) preResHandler(ctx *context) error {
 	ctx.timer = time.AfterFunc(t.Config.RequestTimeout, func() {
 		ctx.requestTimedOut = true
 		t.defaultTransport.CancelRequest(ctx.req)
+		t.logger.Info("request timed out: %s", ctx.req.URL.String())
 	})
 
 	return nil

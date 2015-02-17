@@ -33,6 +33,11 @@ type Config struct {
 	// BreakerConfig is used to configure the breaker internally used as circuit
 	// breaker.
 	BreakerConfig breaker.Config
+
+	// LogLevel defines the log level used to log process information. If none is
+	// given, logging is disabled. See
+	// https://godoc.org/github.com/op/go-logging#Level.
+	LogLevel string
 }
 
 // NewHTTPClient creates a new *http.Client.
@@ -48,17 +53,18 @@ type Config struct {
 //   res, err = c.Get("https://google.com/")
 //
 func NewHTTPClient(c Config) *http.Client {
-	httpClient := &http.Client{
+	hc := &http.Client{
 		Transport: transport.NewTransport(transport.Config{
 			ReconnectDelay: c.ReconnectDelay,
 			ConnectTimeout: c.ConnectTimeout,
 			RequestTimeout: c.RequestTimeout,
-
-			RequestRetry: c.RequestRetry,
+			RequestRetry:   c.RequestRetry,
 
 			BreakerConfig: c.BreakerConfig,
+
+			LogLevel: c.LogLevel,
 		}),
 	}
 
-	return httpClient
+	return hc
 }

@@ -1,9 +1,11 @@
 package breaker
 
 import (
-	"fmt"
 	"sync"
 	"time"
+
+	"github.com/op/go-logging"
+	"github.com/zyndiecate/httpro/logger"
 )
 
 var (
@@ -33,6 +35,11 @@ type Config struct {
 	// MaxPerformanceLoss describes the percentage of action performance allowed to
 	// loose before the breaker stops to accept new actions.
 	MaxPerformanceLoss uint
+
+	// LogLevel defines the log level used to log process information. If none is
+	// given, logging is disabled. See
+	// https://godoc.org/github.com/op/go-logging#Level.
+	LogLevel string
 }
 
 type state struct {
@@ -46,6 +53,7 @@ type Breaker struct {
 	state   state
 	mutex   *sync.Mutex
 	samples []*sample
+	logger  *logging.Logger
 }
 
 func NewBreaker(c Config) *Breaker {
@@ -69,9 +77,12 @@ func NewBreaker(c Config) *Breaker {
 		Config:  c,
 		mutex:   &sync.Mutex{},
 		samples: []*sample{},
+		logger:  logger.NewLogger(logger.Config{Name: "breaker", Level: c.LogLevel}),
 	}
 
 	go b.trackState()
+
+	b.logger.Debug("created breaker with config: %#v", c)
 
 	return b
 }
@@ -132,7 +143,7 @@ func (b *Breaker) trackState() {
 		}
 
 		if err := b.accept(); err != nil {
-			fmt.Printf("%s, waiting for %s\n", err.Error(), b.Config.BreakTTL.String())
+			b.logger.Error("no new action accepted for %s: %s", b.Config.BreakTTL.String(), err.Error())
 			time.Sleep(b.Config.BreakTTL)
 		}
 
@@ -147,9 +158,7 @@ func (b *Breaker) trackState() {
 		// calculate performance loss
 		b.state.performanceLoss = b.calculatePerformanceLoss()
 
-		// TODO proper configurable logging
-		fmt.Printf("breaker state: %+v\n", b.state)
-		fmt.Printf("currently obtaining %d samples\n", len(b.samples))
+		b.logger.Debug("breaker state: %+v\n", b.state)
 	}
 }
 
