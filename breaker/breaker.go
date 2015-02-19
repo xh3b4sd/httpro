@@ -9,20 +9,20 @@ import (
 )
 
 var (
-	DefaultMaxConcurrentActions uint = 20
-	DefaultBreakTTL                  = 10 * time.Second
-	DefaultMaxErrorRate         uint = 10
-	DefaultMaxPerformanceLoss   uint = 25
+	DefaultMaxConcurrencyLimit uint = 20
+	DefaultBreakTTL                 = 10 * time.Second
+	DefaultMaxErrorRate        uint = 10
+	DefaultMaxPerformanceLoss  uint = 25
 
 	defaultSampleTTL    = 2 * time.Second
 	defaultMinSampleVol = 10
 )
 
 type Config struct {
-	// MaxConcurrentActions describes the maximum number of concurrent actions
+	// MaxConcurrencyLimit describes the maximum number of concurrent actions
 	// that are allowed to happen. In case there are more actions than this value
 	// allows, the breaker stops to accept new actions.
-	MaxConcurrentActions uint
+	MaxConcurrencyLimit uint
 
 	// BreakTTL describes the amount of time no new actions will be accepted
 	// after the breaker stops to accept new actions.
@@ -43,9 +43,9 @@ type Config struct {
 }
 
 type state struct {
-	concurrentActions int64
-	errorRate         int64
-	performanceLoss   int64
+	concurrencyLimit int64
+	errorRate        int64
+	performanceLoss  int64
 }
 
 type Breaker struct {
@@ -57,8 +57,8 @@ type Breaker struct {
 }
 
 func NewBreaker(c Config) *Breaker {
-	if c.MaxConcurrentActions == 0 {
-		c.MaxConcurrentActions = DefaultMaxConcurrentActions
+	if c.MaxConcurrencyLimit == 0 {
+		c.MaxConcurrencyLimit = DefaultMaxConcurrencyLimit
 	}
 
 	if c.BreakTTL == 0 {
@@ -150,7 +150,7 @@ func (b *Breaker) trackState() {
 		cs := b.currentSample()
 
 		// calculate concurrent actions
-		b.state.concurrentActions = cs.concurrentActions
+		b.state.concurrencyLimit = cs.concurrencyLimit
 
 		// calculate error rate
 		b.state.errorRate = b.calculateErrorRate()
@@ -163,8 +163,8 @@ func (b *Breaker) trackState() {
 }
 
 func (b *Breaker) accept() error {
-	if b.state.concurrentActions > int64(b.Config.MaxConcurrentActions) {
-		return Mask(ErrMaxConcurrentActionsReached)
+	if b.state.concurrencyLimit > int64(b.Config.MaxConcurrencyLimit) {
+		return Mask(ErrMaxConcurrencyLimitReached)
 	}
 
 	if b.state.errorRate > int64(b.Config.MaxErrorRate) {

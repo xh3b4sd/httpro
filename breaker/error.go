@@ -5,10 +5,10 @@ import (
 )
 
 var (
-	ErrMaxConcurrentActionsReached = errgo.New("max concurrent actions reached")
-	ErrMaxErrorRateReached         = errgo.New("max error rate reached")
-	ErrMaxPerformanceLossReached   = errgo.New("max performance loss reached")
-	ErrNilAction                   = errgo.New("cannot call nil action")
+	ErrMaxConcurrencyLimitReached = errgo.New("max concurrent actions reached")
+	ErrMaxErrorRateReached        = errgo.New("max error rate reached")
+	ErrMaxPerformanceLossReached  = errgo.New("max performance loss reached")
+	ErrNilAction                  = errgo.New("cannot call nil action")
 
 	Mask = errgo.MaskFunc(
 		errgo.Any,
@@ -19,15 +19,15 @@ var (
 // IsErrBreakerError checks whether the given error is caused by the breaker or
 // not.
 func IsErrBreakerError(err error) bool {
-	return IsErrMaxConcurrentActionsReached(err) ||
+	return IsErrMaxConcurrencyLimitReached(err) ||
 		IsErrMaxErrorRateReached(err) ||
 		IsErrMaxPerformanceLossReached(err)
 }
 
-// IsErrMaxConcurrentActionsReached checks whether the given error is caused by
-// the MaxConcurrentActions configuration or not.
-func IsErrMaxConcurrentActionsReached(err error) bool {
-	return errgo.Cause(err) == ErrMaxConcurrentActionsReached
+// IsErrMaxConcurrencyLimitReached checks whether the given error is caused by
+// the MaxConcurrencyLimit configuration or not.
+func IsErrMaxConcurrencyLimitReached(err error) bool {
+	return errgo.Cause(err) == ErrMaxConcurrencyLimitReached
 }
 
 // IsErrMaxErrorRateReached checks whether the given error is caused by the
