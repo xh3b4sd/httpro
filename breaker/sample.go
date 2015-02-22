@@ -13,10 +13,10 @@ type sampleConfig struct {
 type sample struct {
 	sampleConfig
 
-	concurrencyLimit int64
-	totalActions     int64
-	totalFailures    int64
-	performances     []int64
+	concurrentActions int64
+	totalActions      int64
+	totalFailures     int64
+	performances      []int64
 }
 
 func newSample(c sampleConfig) *sample {
@@ -25,20 +25,20 @@ func newSample(c sampleConfig) *sample {
 
 func (s *sample) actionStart() int64 {
 	s.totalActions = atomic.AddInt64(&s.totalActions, 1)
-	s.concurrencyLimit = atomic.AddInt64(&s.concurrencyLimit, 1)
+	s.concurrentActions = atomic.AddInt64(&s.concurrentActions, 1)
 
 	return time.Now().UnixNano()
 }
 
 func (s *sample) actionSuccess() int64 {
-	s.concurrencyLimit = atomic.AddInt64(&s.concurrencyLimit, -1)
+	s.concurrentActions = atomic.AddInt64(&s.concurrentActions, -1)
 
 	return time.Now().UnixNano()
 }
 
 func (s *sample) actionFailure() int64 {
 	s.totalFailures = atomic.AddInt64(&s.totalFailures, 1)
-	s.concurrencyLimit = atomic.AddInt64(&s.concurrencyLimit, -1)
+	s.concurrentActions = atomic.AddInt64(&s.concurrentActions, -1)
 
 	return time.Now().UnixNano()
 }

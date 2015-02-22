@@ -5,10 +5,10 @@ import (
 )
 
 var (
-	ErrMaxConcurrencyLimitReached = errgo.New("max concurrent actions reached")
-	ErrMaxErrorRateReached        = errgo.New("max error rate reached")
-	ErrMaxPerformanceLossReached  = errgo.New("max performance loss reached")
-	ErrNilAction                  = errgo.New("cannot call nil action")
+	ErrMaxConcurrencyLimitExceeded = errgo.New("max concurrent actions exceeded")
+	ErrMaxErrorRateExceeded        = errgo.New("max error rate exceeded")
+	ErrMaxPerformanceLossExceeded  = errgo.New("max performance loss exceeded")
+	ErrNilAction                   = errgo.New("cannot call nil action")
 
 	Mask = errgo.MaskFunc(
 		errgo.Any,
@@ -19,25 +19,25 @@ var (
 // IsErrBreakerError checks whether the given error is caused by the breaker or
 // not.
 func IsErrBreakerError(err error) bool {
-	return IsErrMaxConcurrencyLimitReached(err) ||
-		IsErrMaxErrorRateReached(err) ||
-		IsErrMaxPerformanceLossReached(err)
+	return IsErrMaxConcurrencyLimitExceeded(err) ||
+		IsErrMaxErrorRateExceeded(err) ||
+		IsErrMaxPerformanceLossExceeded(err)
 }
 
-// IsErrMaxConcurrencyLimitReached checks whether the given error is caused by
+// IsErrMaxConcurrencyLimitExceeded checks whether the given error is caused by
 // the MaxConcurrencyLimit configuration or not.
-func IsErrMaxConcurrencyLimitReached(err error) bool {
-	return errgo.Cause(err) == ErrMaxConcurrencyLimitReached
+func IsErrMaxConcurrencyLimitExceeded(err error) bool {
+	return errgo.Cause(err) == ErrMaxConcurrencyLimitExceeded
 }
 
-// IsErrMaxErrorRateReached checks whether the given error is caused by the
+// IsErrMaxErrorRateExceeded checks whether the given error is caused by the
 // MaxErrorRate configuration or not.
-func IsErrMaxErrorRateReached(err error) bool {
-	return errgo.Cause(err) == ErrMaxErrorRateReached
+func IsErrMaxErrorRateExceeded(err error) bool {
+	return errgo.Cause(err) == ErrMaxErrorRateExceeded
 }
 
-// IsErrMaxPerformanceLossReached checks whether the given error is caused by
+// IsErrMaxPerformanceLossExceeded checks whether the given error is caused by
 // the MaxPerformanceLoss configuration or not.
-func IsErrMaxPerformanceLossReached(err error) bool {
-	return errgo.Cause(err) == ErrMaxPerformanceLossReached
+func IsErrMaxPerformanceLossExceeded(err error) bool {
+	return errgo.Cause(err) == ErrMaxPerformanceLossExceeded
 }

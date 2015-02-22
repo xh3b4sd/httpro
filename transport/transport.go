@@ -107,6 +107,25 @@ func (t *Transport) CloseIdleConnections() {
 	t.defaultTransport.CloseIdleConnections()
 }
 
+func (t *Transport) DialFunc(network, addr string) (net.Conn, error) {
+	var err error
+	var conn net.Conn
+
+	for i := 0; i < int(t.Config.ConnectRetry); i++ {
+		conn, err = net.DialTimeout(network, addr, t.Config.ConnectTimeout)
+
+		if IsErrConnectRefused(err) {
+			time.Sleep(t.Config.ReconnectDelay)
+			t.logger.Info("retry connection to %s", addr)
+			continue
+		} else if err != nil {
+			return nil, Mask(err)
+		}
+	}
+
+	return conn, Mask(err)
+}
+
 func (t *Transport) RoundTrip(req *http.Request) (*http.Response, error) {
 	var err error
 	var res *http.Response
@@ -127,7 +146,9 @@ func (t *Transport) RoundTrip(req *http.Request) (*http.Response, error) {
 				continue
 			}
 
-			t.logger.Info("retry request to %s", req.URL.String())
+			if i > 0 {
+				t.logger.Info("retry request to %s", req.URL.String())
+			}
 		}
 
 		return Mask(err)
@@ -142,25 +163,6 @@ func (t *Transport) RoundTrip(req *http.Request) (*http.Response, error) {
 	}
 
 	return res, Mask(err)
-}
-
-func (t *Transport) DialFunc(network, addr string) (net.Conn, error) {
-	var err error
-	var conn net.Conn
-
-	for i := 0; i < int(t.Config.ConnectRetry); i++ {
-		conn, err = net.DialTimeout(network, addr, t.Config.ConnectTimeout)
-
-		if IsErrConnectRefused(err) {
-			time.Sleep(t.Config.ReconnectDelay)
-			t.logger.Info("retry connection to %s", addr)
-			continue
-		} else if err != nil {
-			return nil, Mask(err)
-		}
-	}
-
-	return conn, Mask(err)
 }
 
 //------------------------------------------------------------------------------

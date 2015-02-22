@@ -36,8 +36,15 @@ func random(min, max int) int {
 }
 
 func newTestServer(c testServerConfig) *testServer {
-	n := random(45000, 49000)
-	port := strconv.Itoa(n)
+	var addr string
+	// Check if the given port is available. It it is not, try again.
+	tl, terr := net.Listen("tcp", "127.0.0.1:0")
+	if terr != nil {
+		return newTestServer(c)
+	} else {
+		addr = tl.Addr().String()
+		tl.Close()
+	}
 
 	reqCount := 0
 
@@ -61,7 +68,7 @@ func newTestServer(c testServerConfig) *testServer {
 
 	var l net.Listener
 	ts := &testServer{
-		URL:      "http://localhost:" + port,
+		URL:      "http://" + addr,
 		Listener: l,
 		Server:   srv,
 	}
@@ -70,7 +77,7 @@ func newTestServer(c testServerConfig) *testServer {
 		time.Sleep(c.NoConnectRefusedAfter)
 
 		var err error
-		ts.Listener, err = net.Listen("tcp", "localhost:"+port)
+		ts.Listener, err = net.Listen("tcp", addr)
 		if err != nil {
 			panic(err)
 		}

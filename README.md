@@ -10,9 +10,9 @@ sophisticated HTTP client library
 | request timeouts | limit the time it takes to process a request |
 | request retries | retry requests once they failed |
 | reconnect delays | wait some time before trying to reconnect to hosts |
-| concurrency limit | stop processing requests once a given concurrency limit is reached |
-| error rates | stop processing requests once a given error rate is reached |
-| performance loss | stop processing requests once a given performance loss is reached |
+| concurrency limit | stop processing requests once a given concurrency limit is exceeded |
+| error rates | stop processing requests once a given error rate is exceeded |
+| performance loss | stop processing requests once a given performance loss is exceeded |
 
 #### docs
 

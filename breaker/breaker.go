@@ -13,9 +13,8 @@ var (
 	DefaultBreakTTL                 = 10 * time.Second
 	DefaultMaxErrorRate        uint = 10
 	DefaultMaxPerformanceLoss  uint = 25
-
-	defaultSampleTTL    = 2 * time.Second
-	defaultMinSampleVol = 10
+	DefaultSampleTTL                = 2 * time.Second
+	DefaultMinSampleVol             = 10
 )
 
 type Config struct {
@@ -40,12 +39,19 @@ type Config struct {
 	// given, logging is disabled. See
 	// https://godoc.org/github.com/op/go-logging#Level.
 	LogLevel string
+
+	// SampleTTL is the time a sample is allowed to live.
+	SampleTTL time.Duration
+
+	// MinSampleVolume is the number of samples needed to calculate breaker
+	// metrics.
+	MinSampleVol int
 }
 
 type state struct {
-	concurrencyLimit int64
-	errorRate        int64
-	performanceLoss  int64
+	concurrentActions int64
+	errorRate         int64
+	performanceLoss   int64
 }
 
 type Breaker struct {
@@ -73,6 +79,14 @@ func NewBreaker(c Config) *Breaker {
 		c.MaxPerformanceLoss = DefaultMaxPerformanceLoss
 	}
 
+	if c.SampleTTL == 0 {
+		c.SampleTTL = DefaultSampleTTL
+	}
+
+	if c.MinSampleVol == 0 {
+		c.MinSampleVol = DefaultMinSampleVol
+	}
+
 	b := &Breaker{
 		Config:  c,
 		mutex:   &sync.Mutex{},
@@ -80,7 +94,11 @@ func NewBreaker(c Config) *Breaker {
 		logger:  logger.NewLogger(logger.Config{Name: "breaker", Level: c.LogLevel}),
 	}
 
-	go b.trackState()
+	go func() {
+		for {
+			b.trackState()
+		}
+	}()
 
 	b.logger.Debug("created breaker with config: %#v", c)
 
@@ -127,52 +145,43 @@ func (b *Breaker) newSample() *sample {
 }
 
 func (b *Breaker) trackState() {
-	for {
-		time.Sleep(defaultSampleTTL)
+	if len(b.samples) < b.Config.MinSampleVol {
+		return
+	}
 
-		// add new sample
-		b.samples = append(b.samples, b.newSample())
+	if err := b.accept(); err != nil {
+		b.logger.Error("no new action accepted for %s: %s", b.Config.BreakTTL.String(), err.Error())
+		time.Sleep(b.Config.BreakTTL)
+	}
 
-		// remove old sample
-		if len(b.samples) > defaultMinSampleVol {
-			b.samples = b.samples[1:len(b.samples)]
-		}
+	b.calculateMetrics()
+	b.cycleSamples()
 
-		if len(b.samples) < defaultMinSampleVol {
-			continue
-		}
+	b.logger.Debug("breaker state: %+v\n", b.state)
+	time.Sleep(b.Config.SampleTTL)
+}
 
-		if err := b.accept(); err != nil {
-			b.logger.Error("no new action accepted for %s: %s", b.Config.BreakTTL.String(), err.Error())
-			time.Sleep(b.Config.BreakTTL)
-		}
+func (b *Breaker) cycleSamples() {
+	// add new sample
+	b.samples = append(b.samples, b.newSample())
 
-		cs := b.currentSample()
-
-		// calculate concurrent actions
-		b.state.concurrencyLimit = cs.concurrencyLimit
-
-		// calculate error rate
-		b.state.errorRate = b.calculateErrorRate()
-
-		// calculate performance loss
-		b.state.performanceLoss = b.calculatePerformanceLoss()
-
-		b.logger.Debug("breaker state: %+v\n", b.state)
+	// remove old sample
+	if len(b.samples) > b.Config.MinSampleVol {
+		b.samples = b.samples[1:len(b.samples)]
 	}
 }
 
 func (b *Breaker) accept() error {
-	if b.state.concurrencyLimit > int64(b.Config.MaxConcurrencyLimit) {
-		return Mask(ErrMaxConcurrencyLimitReached)
+	if b.state.concurrentActions > int64(b.Config.MaxConcurrencyLimit) {
+		return Mask(ErrMaxConcurrencyLimitExceeded)
 	}
 
 	if b.state.errorRate > int64(b.Config.MaxErrorRate) {
-		return Mask(ErrMaxErrorRateReached)
+		return Mask(ErrMaxErrorRateExceeded)
 	}
 
 	if b.state.performanceLoss > int64(b.Config.MaxPerformanceLoss) {
-		return Mask(ErrMaxPerformanceLossReached)
+		return Mask(ErrMaxPerformanceLossExceeded)
 	}
 
 	return nil
@@ -186,9 +195,17 @@ func (b *Breaker) currentSample() *sample {
 	return b.samples[len(b.samples)-1]
 }
 
+func (b *Breaker) calculateMetrics() {
+	cs := b.currentSample()
+
+	b.state.concurrentActions = cs.concurrentActions
+	b.state.errorRate = b.calculateErrorRate()
+	b.state.performanceLoss = b.calculatePerformanceLoss()
+}
+
 func (b *Breaker) calculatePerformanceLoss() int64 {
 	histPerfAvg := calculatePerformanceAvg(b.samples[:len(b.samples)-1])
-	currPerfAvg := calculatePerformanceAvg(b.samples[len(b.samples)-2 : len(b.samples)-1])
+	currPerfAvg := calculatePerformanceAvg(b.samples[len(b.samples)-1 : len(b.samples)])
 
 	if histPerfAvg == 0 || currPerfAvg == 0 {
 		return 0

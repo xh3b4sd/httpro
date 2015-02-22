@@ -26,6 +26,7 @@ var _ = Describe("httpro", func() {
 
 	BeforeEach(func() {
 		err = nil
+		res = nil
 		ts = nil
 	})
 
@@ -61,7 +62,7 @@ var _ = Describe("httpro", func() {
 		Describe("connection refused", func() {
 			Describe("default client", func() {
 				BeforeEach(func() {
-					ts = newTestServer(testServerConfig{NoConnectRefusedAfter: 300 * time.Millisecond})
+					ts = newTestServer(testServerConfig{NoConnectRefusedAfter: 400 * time.Millisecond})
 					c := httpro.NewHTTPClient(httpro.Config{})
 					res, err = c.Get(ts.URL)
 				})
@@ -77,7 +78,7 @@ var _ = Describe("httpro", func() {
 
 			Describe("reconnect delay client", func() {
 				BeforeEach(func() {
-					ts = newTestServer(testServerConfig{NoConnectRefusedAfter: 300 * time.Millisecond})
+					ts = newTestServer(testServerConfig{NoConnectRefusedAfter: 400 * time.Millisecond})
 					c := httpro.NewHTTPClient(httpro.Config{ReconnectDelay: 400 * time.Millisecond})
 					res, err = c.Get(ts.URL)
 				})
