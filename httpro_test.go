@@ -49,11 +49,8 @@ var _ = Describe("httpro", func() {
 					res, err = c.Get(ts.URL)
 				})
 
-				It("should respond without error", func() {
-					Expect(err).To(BeNil())
-				})
-
 				It("should respond with status code 200", func() {
+					Expect(err).To(BeNil())
 					Expect(res.StatusCode).To(Equal(200))
 				})
 			})
@@ -69,9 +66,6 @@ var _ = Describe("httpro", func() {
 
 				It("should respond with connect refused error", func() {
 					Expect(transport.IsErrConnectRefused(err)).To(BeTrue())
-				})
-
-				It("should respond empty", func() {
 					Expect(res).To(BeNil())
 				})
 			})
@@ -83,11 +77,8 @@ var _ = Describe("httpro", func() {
 					res, err = c.Get(ts.URL)
 				})
 
-				It("should respond without error", func() {
-					Expect(err).To(BeNil())
-				})
-
 				It("should respond with status code 200", func() {
+					Expect(err).To(BeNil())
 					Expect(res.StatusCode).To(Equal(200))
 				})
 			})
@@ -101,11 +92,8 @@ var _ = Describe("httpro", func() {
 					res, err = c.Get(ts.URL)
 				})
 
-				It("should respond without error", func() {
-					Expect(err).To(BeNil())
-				})
-
 				It("should respond with status code 200", func() {
+					Expect(err).To(BeNil())
 					Expect(res.StatusCode).To(Equal(200))
 				})
 			})
@@ -119,9 +107,6 @@ var _ = Describe("httpro", func() {
 
 				It("should respond with timeout error", func() {
 					Expect(transport.IsErrRequestTimeout(err)).To(BeTrue())
-				})
-
-				It("should respond empty", func() {
 					Expect(res).To(BeNil())
 				})
 			})
@@ -137,9 +122,6 @@ var _ = Describe("httpro", func() {
 
 				It("should respond with timeout error", func() {
 					Expect(transport.IsErrRequestTimeout(err)).To(BeTrue())
-				})
-
-				It("should respond empty", func() {
 					Expect(res).To(BeNil())
 				})
 			})
@@ -151,11 +133,8 @@ var _ = Describe("httpro", func() {
 					res, err = c.Get(ts.URL)
 				})
 
-				It("should respond without error", func() {
-					Expect(err).To(BeNil())
-				})
-
 				It("should respond with status code 200", func() {
+					Expect(err).To(BeNil())
 					Expect(res.StatusCode).To(Equal(200))
 				})
 			})
@@ -169,11 +148,8 @@ var _ = Describe("httpro", func() {
 					res, err = c.Get(ts.URL)
 				})
 
-				It("should respond without error", func() {
-					Expect(err).To(BeNil())
-				})
-
 				It("should respond with status code 500", func() {
+					Expect(err).To(BeNil())
 					Expect(res.StatusCode).To(Equal(500))
 				})
 			})
@@ -185,11 +161,8 @@ var _ = Describe("httpro", func() {
 					res, err = c.Get(ts.URL)
 				})
 
-				It("should respond without error", func() {
-					Expect(err).To(BeNil())
-				})
-
 				It("should respond with status code 200", func() {
+					Expect(err).To(BeNil())
 					Expect(res.StatusCode).To(Equal(200))
 				})
 			})
