@@ -44,7 +44,7 @@ var _ = Describe("httpro", func() {
 		Describe("standard route", func() {
 			Describe("default client", func() {
 				BeforeEach(func() {
-					ts = newTestServer(testServerConfig{})
+					ts = newTestServer(testServerConfig{Handler: newTestHTTPHandlerStatusCodeRetry(200, 4)})
 					c := httpro.NewHTTPClient(httpro.Config{})
 					res, err = c.Get(ts.URL)
 				})
@@ -59,7 +59,7 @@ var _ = Describe("httpro", func() {
 		Describe("connection refused", func() {
 			Describe("default client", func() {
 				BeforeEach(func() {
-					ts = newTestServer(testServerConfig{NoConnectRefusedAfter: 400 * time.Millisecond})
+					ts = newTestServerConnectDelay(testServerConfig{Handler: newTestHTTPHandlerStatusCodeRetry(200, 4), NoConnectRefusedAfter: 400 * time.Millisecond})
 					c := httpro.NewHTTPClient(httpro.Config{})
 					res, err = c.Get(ts.URL)
 				})
@@ -72,7 +72,7 @@ var _ = Describe("httpro", func() {
 
 			Describe("reconnect delay client", func() {
 				BeforeEach(func() {
-					ts = newTestServer(testServerConfig{NoConnectRefusedAfter: 400 * time.Millisecond})
+					ts = newTestServer(testServerConfig{Handler: newTestHTTPHandlerStatusCodeRetry(200, 4), NoConnectRefusedAfter: 400 * time.Millisecond})
 					c := httpro.NewHTTPClient(httpro.Config{ReconnectDelay: 400 * time.Millisecond})
 					res, err = c.Get(ts.URL)
 				})
@@ -87,7 +87,7 @@ var _ = Describe("httpro", func() {
 		Describe("request timed out", func() {
 			Describe("default client", func() {
 				BeforeEach(func() {
-					ts = newTestServer(testServerConfig{NoRequestTimeoutOnRetry: 3})
+					ts = newTestServer(testServerConfig{Handler: newTestHTTPHandlerRequestTimeoutRetry(200, 4)})
 					c := httpro.NewHTTPClient(httpro.Config{})
 					res, err = c.Get(ts.URL)
 				})
@@ -100,7 +100,7 @@ var _ = Describe("httpro", func() {
 
 			Describe("request timeout client", func() {
 				BeforeEach(func() {
-					ts = newTestServer(testServerConfig{NoRequestTimeoutOnRetry: 3})
+					ts = newTestServer(testServerConfig{Handler: newTestHTTPHandlerRequestTimeoutRetry(200, 4)})
 					c := httpro.NewHTTPClient(httpro.Config{RequestTimeout: 50 * time.Millisecond})
 					res, err = c.Get(ts.URL)
 				})
@@ -115,8 +115,8 @@ var _ = Describe("httpro", func() {
 		Describe("request timed out and request retry", func() {
 			Describe("request timeout and retry client", func() {
 				BeforeEach(func() {
-					ts = newTestServer(testServerConfig{NoRequestTimeoutOnRetry: 3})
-					c := httpro.NewHTTPClient(httpro.Config{RequestTimeout: 50 * time.Millisecond, RequestRetry: 2})
+					ts = newTestServer(testServerConfig{Handler: newTestHTTPHandlerRequestTimeoutRetry(1000, 4)})
+					c := httpro.NewHTTPClient(httpro.Config{RequestTimeout: 500 * time.Millisecond, RequestRetry: 2})
 					res, err = c.Get(ts.URL)
 				})
 
@@ -128,8 +128,8 @@ var _ = Describe("httpro", func() {
 
 			Describe("request timed out route; enough retries", func() {
 				BeforeEach(func() {
-					ts = newTestServer(testServerConfig{NoRequestTimeoutOnRetry: 3})
-					c := httpro.NewHTTPClient(httpro.Config{RequestTimeout: 50 * time.Millisecond, RequestRetry: 3})
+					ts = newTestServer(testServerConfig{Handler: newTestHTTPHandlerRequestTimeoutRetry(1000, 4)})
+					c := httpro.NewHTTPClient(httpro.Config{RequestTimeout: 500 * time.Millisecond, RequestRetry: 4})
 					res, err = c.Get(ts.URL)
 				})
 
@@ -143,7 +143,7 @@ var _ = Describe("httpro", func() {
 		Describe("error responses and request retry", func() {
 			Describe("default client", func() {
 				BeforeEach(func() {
-					ts = newTestServer(testServerConfig{StatusCode: 500, NoStatusCodeOnRetry: 3})
+					ts = newTestServer(testServerConfig{Handler: newTestHTTPHandlerStatusCodeRetry(500, 3)})
 					c := httpro.NewHTTPClient(httpro.Config{})
 					res, err = c.Get(ts.URL)
 				})
@@ -156,7 +156,7 @@ var _ = Describe("httpro", func() {
 
 			Describe("retry client", func() {
 				BeforeEach(func() {
-					ts = newTestServer(testServerConfig{StatusCode: 500, NoStatusCodeOnRetry: 3})
+					ts = newTestServer(testServerConfig{Handler: newTestHTTPHandlerStatusCodeRetry(500, 3)})
 					c := httpro.NewHTTPClient(httpro.Config{RequestRetry: 3})
 					res, err = c.Get(ts.URL)
 				})

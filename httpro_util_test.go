@@ -2,7 +2,6 @@ package httpro_test
 
 import (
 	"fmt"
-	"math/rand"
 	"net"
 	"net/http"
 	"strconv"
@@ -10,10 +9,8 @@ import (
 )
 
 type testServerConfig struct {
-	StatusCode              int
-	NoRequestTimeoutOnRetry uint
-	NoStatusCodeOnRetry     uint
-	NoConnectRefusedAfter   time.Duration
+	Handler               http.HandlerFunc
+	NoConnectRefusedAfter time.Duration
 }
 
 type testServer struct {
@@ -30,47 +27,85 @@ func (ts *testServer) Listen() {
 	ts.Server.Serve(ts.Listener)
 }
 
-func random(min, max int) int {
-	rand.Seed(time.Now().Unix())
-	return rand.Intn(max-min) + min
-}
-
-func newTestServer(c testServerConfig) *testServer {
+func newTestServerAddr() string {
 	var addr string
+
 	// Check if the given port is available. It it is not, try again.
 	tl, terr := net.Listen("tcp", "127.0.0.1:0")
 	if terr != nil {
-		return newTestServer(c)
+		return newTestServerAddr()
 	} else {
 		addr = tl.Addr().String()
 		tl.Close()
 	}
 
-	reqCount := 0
+	return addr
+}
 
-	srv := &http.Server{
-		Handler: http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			reqCount++
+func newTestHTTPHandlerRequestTimeoutRetry(timeout time.Duration, noTimeoutOnRetry int) http.HandlerFunc {
+	retry := 0
 
-			if c.StatusCode > 0 && c.NoStatusCodeOnRetry > 0 && reqCount < int(c.NoStatusCodeOnRetry) {
-				w.WriteHeader(c.StatusCode)
-				fmt.Fprint(w, strconv.Itoa(c.StatusCode))
-				return
-			}
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		retry++
 
-			if c.NoRequestTimeoutOnRetry > 0 && reqCount < int(c.NoRequestTimeoutOnRetry) {
-				time.Sleep(100 * time.Millisecond)
-			}
+		if retry < noTimeoutOnRetry {
+			time.Sleep(timeout)
+		}
 
-			fmt.Fprint(w, "OK")
-		}),
-	}
+		fmt.Fprint(w, "OK")
+	})
+}
+
+func newTestHTTPHandlerStatusCodeRetry(statusCode, noCodeOnRetry int) http.HandlerFunc {
+	retry := 0
+
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		retry++
+
+		if retry < noCodeOnRetry {
+			w.WriteHeader(statusCode)
+			fmt.Fprint(w, strconv.Itoa(statusCode))
+		}
+
+		fmt.Fprint(w, "OK")
+	})
+}
+
+func newTestServer(c testServerConfig) *testServer {
+	addr := newTestServerAddr()
 
 	var l net.Listener
 	ts := &testServer{
 		URL:      "http://" + addr,
 		Listener: l,
-		Server:   srv,
+		Server: &http.Server{
+			Handler: c.Handler,
+		},
+	}
+
+	var err error
+	ts.Listener, err = net.Listen("tcp", addr)
+	if err != nil {
+		panic(err)
+	}
+
+	go func() {
+		ts.Listen()
+	}()
+
+	return ts
+}
+
+func newTestServerConnectDelay(c testServerConfig) *testServer {
+	addr := newTestServerAddr()
+
+	var l net.Listener
+	ts := &testServer{
+		URL:      "http://" + addr,
+		Listener: l,
+		Server: &http.Server{
+			Handler: c.Handler,
+		},
 	}
 
 	go func() {
