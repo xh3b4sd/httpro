@@ -132,8 +132,11 @@ func (t *Transport) RoundTrip(req *http.Request) (*http.Response, error) {
 
 	err = t.Breaker.Run(func() error {
 		for i := 0; i < int(t.Config.RequestRetry); i++ {
-			err = nil
+			if i > 0 {
+				t.logger.Info("retry request to %s", req.URL.String())
+			}
 
+			err = nil
 			res, err = t.roundTrip(req)
 			if err != nil {
 				continue
@@ -144,10 +147,6 @@ func (t *Transport) RoundTrip(req *http.Request) (*http.Response, error) {
 				// reset this error.
 				err = ErrStatusCode5XX
 				continue
-			}
-
-			if i > 0 {
-				t.logger.Info("retry request to %s", req.URL.String())
 			}
 		}
 
