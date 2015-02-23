@@ -43,7 +43,7 @@ type Config struct {
 	// SampleTTL is the time a sample is allowed to live.
 	SampleTTL time.Duration
 
-	// MinSampleVolume is the number of samples needed to calculate breaker
+	// MinSampleVol is the number of samples needed to calculate breaker
 	// metrics.
 	MinSampleVol int
 }
