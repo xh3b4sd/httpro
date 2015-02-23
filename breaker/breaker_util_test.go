@@ -16,18 +16,13 @@ func newTestBreaker(c Config) *Breaker {
 // newTestSamples returns a collection of 10 samples, that is needed to
 // calculate breaker metrics used to descide to break or not.
 func newTestSamples(b *Breaker) []*sample {
-	return []*sample{
-		b.newSample(),
-		b.newSample(),
-		b.newSample(),
-		b.newSample(),
-		b.newSample(),
-		b.newSample(),
-		b.newSample(),
-		b.newSample(),
-		b.newSample(),
-		b.newSample(),
+	s := []*sample{}
+
+	for i := 0; i < 10; i++ {
+		s = append(s, b.newSample())
 	}
+
+	return s
 }
 
 type testSampleConfig struct {
