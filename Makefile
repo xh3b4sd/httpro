@@ -11,7 +11,7 @@ ifndef GOARCH
 	GOARCH := $(shell go env GOARCH)
 endif
 
-.PHONY: clean tests test get-deps update-deps fmt deps
+.PHONY: clean tests test get-deps fmt deps
 
 all: get-deps $(PROJECT)
 
