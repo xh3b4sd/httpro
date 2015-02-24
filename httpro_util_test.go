@@ -5,6 +5,7 @@ import (
 	"net"
 	"net/http"
 	"strconv"
+	"sync/atomic"
 	"time"
 )
 
@@ -43,12 +44,12 @@ func newTestServerAddr() string {
 }
 
 func newTestHTTPHandlerRequestTimeoutRetry(timeout time.Duration, noTimeoutOnRetry int) http.HandlerFunc {
-	retry := 0
+	var retry int64
 
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		retry++
+		retry = atomic.AddInt64(&retry, 1)
 
-		if retry < noTimeoutOnRetry {
+		if int(retry) < noTimeoutOnRetry {
 			time.Sleep(timeout)
 		}
 

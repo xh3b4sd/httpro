@@ -59,9 +59,8 @@ var _ = Describe("httpro", func() {
 		Describe("connection refused", func() {
 			Describe("default client", func() {
 				BeforeEach(func() {
-					ts = newTestServerConnectDelay(testServerConfig{Handler: newTestHTTPHandlerStatusCodeRetry(200, 4), NoConnectRefusedAfter: 400 * time.Millisecond})
 					c := httpro.NewHTTPClient(httpro.Config{})
-					res, err = c.Get(ts.URL)
+					res, err = c.Get("http://127.0.0.1:38592") // nothing should listen here
 				})
 
 				It("should respond with connect refused error", func() {
@@ -73,7 +72,7 @@ var _ = Describe("httpro", func() {
 			Describe("reconnect delay client", func() {
 				BeforeEach(func() {
 					ts = newTestServer(testServerConfig{Handler: newTestHTTPHandlerStatusCodeRetry(200, 4), NoConnectRefusedAfter: 400 * time.Millisecond})
-					c := httpro.NewHTTPClient(httpro.Config{ReconnectDelay: 400 * time.Millisecond})
+					c := httpro.NewHTTPClient(httpro.Config{ConnectRetryDelay: 400 * time.Millisecond})
 					res, err = c.Get(ts.URL)
 				})
 
@@ -87,7 +86,7 @@ var _ = Describe("httpro", func() {
 		Describe("request timed out", func() {
 			Describe("default client", func() {
 				BeforeEach(func() {
-					ts = newTestServer(testServerConfig{Handler: newTestHTTPHandlerRequestTimeoutRetry(200, 4)})
+					ts = newTestServer(testServerConfig{Handler: newTestHTTPHandlerRequestTimeoutRetry(100*time.Millisecond, 4)})
 					c := httpro.NewHTTPClient(httpro.Config{})
 					res, err = c.Get(ts.URL)
 				})
@@ -100,7 +99,7 @@ var _ = Describe("httpro", func() {
 
 			Describe("request timeout client", func() {
 				BeforeEach(func() {
-					ts = newTestServer(testServerConfig{Handler: newTestHTTPHandlerRequestTimeoutRetry(200, 4)})
+					ts = newTestServer(testServerConfig{Handler: newTestHTTPHandlerRequestTimeoutRetry(100*time.Millisecond, 4)})
 					c := httpro.NewHTTPClient(httpro.Config{RequestTimeout: 50 * time.Millisecond})
 					res, err = c.Get(ts.URL)
 				})
@@ -115,8 +114,8 @@ var _ = Describe("httpro", func() {
 		Describe("request timed out and request retry", func() {
 			Describe("request timeout and retry client", func() {
 				BeforeEach(func() {
-					ts = newTestServer(testServerConfig{Handler: newTestHTTPHandlerRequestTimeoutRetry(1000, 4)})
-					c := httpro.NewHTTPClient(httpro.Config{RequestTimeout: 500 * time.Millisecond, RequestRetry: 2})
+					ts = newTestServer(testServerConfig{Handler: newTestHTTPHandlerRequestTimeoutRetry(200*time.Millisecond, 3)})
+					c := httpro.NewHTTPClient(httpro.Config{RequestTimeout: 100 * time.Millisecond, RequestRetry: 2})
 					res, err = c.Get(ts.URL)
 				})
 
@@ -128,8 +127,8 @@ var _ = Describe("httpro", func() {
 
 			Describe("request timed out route; enough retries", func() {
 				BeforeEach(func() {
-					ts = newTestServer(testServerConfig{Handler: newTestHTTPHandlerRequestTimeoutRetry(1000, 4)})
-					c := httpro.NewHTTPClient(httpro.Config{RequestTimeout: 500 * time.Millisecond, RequestRetry: 4})
+					ts = newTestServer(testServerConfig{Handler: newTestHTTPHandlerRequestTimeoutRetry(200*time.Millisecond, 3)})
+					c := httpro.NewHTTPClient(httpro.Config{LogLevel: "debug", RequestTimeout: 100 * time.Millisecond, RequestRetry: 3})
 					res, err = c.Get(ts.URL)
 				})
 
@@ -143,7 +142,7 @@ var _ = Describe("httpro", func() {
 		Describe("error responses and request retry", func() {
 			Describe("default client", func() {
 				BeforeEach(func() {
-					ts = newTestServer(testServerConfig{Handler: newTestHTTPHandlerStatusCodeRetry(500, 3)})
+					ts = newTestServer(testServerConfig{Handler: newTestHTTPHandlerStatusCodeRetry(500, 4)})
 					c := httpro.NewHTTPClient(httpro.Config{})
 					res, err = c.Get(ts.URL)
 				})
@@ -156,7 +155,7 @@ var _ = Describe("httpro", func() {
 
 			Describe("retry client", func() {
 				BeforeEach(func() {
-					ts = newTestServer(testServerConfig{Handler: newTestHTTPHandlerStatusCodeRetry(500, 3)})
+					ts = newTestServer(testServerConfig{Handler: newTestHTTPHandlerStatusCodeRetry(500, 4)})
 					c := httpro.NewHTTPClient(httpro.Config{RequestRetry: 3})
 					res, err = c.Get(ts.URL)
 				})

@@ -11,18 +11,27 @@ import (
 )
 
 var (
-	defaultRequestTimeout = 30 * time.Second
-	defaultConnectTimeout = 30 * time.Second
-	defaultReconnectDelay = 200 * time.Millisecond
-	defaultConnectRetry   = uint(2)
-	defaultRequestRetry   = uint(1)
+	DefaultRequestTimeout = 30 * time.Second
+	DefaultConnectTimeout = 30 * time.Second
+
+	DefaultConnectRetryDelay = 200 * time.Millisecond
+	DefaultRequestRetryDelay = 200 * time.Millisecond
+
+	DefaultConnectRetry = uint(2)
+	DefaultRequestRetry = uint(2)
 )
 
+// Config to configure the HTTP transport.
 type Config struct {
-	// ReconnectDelay describes the time the client should block before
+	// ConnectRetryDelay describes the time the client should block before
 	// attempting to connect again. This configuration is used when the
 	// preceeding connection was refused.
-	ReconnectDelay time.Duration
+	ConnectRetryDelay time.Duration
+
+	// RequestRetryDelay describes the time the client should block before
+	// attempting to try a request again. This configuration is used when the
+	// preceeding connection was failed in terms of status code 5XX or timed out.
+	RequestRetryDelay time.Duration
 
 	// ConnectTimeout is the value used to configure the call to net.DialTimeout.
 	ConnectTimeout time.Duration
@@ -58,24 +67,28 @@ type Transport struct {
 
 // NewTransport creates a new *http.Transport that implements http.RoundTripper.
 func NewTransport(c Config) http.RoundTripper {
-	if c.ReconnectDelay == 0 {
-		c.ReconnectDelay = defaultReconnectDelay
+	if c.ConnectRetryDelay == 0 {
+		c.ConnectRetryDelay = DefaultConnectRetryDelay
+	}
+
+	if c.RequestRetryDelay == 0 {
+		c.RequestRetryDelay = DefaultRequestRetryDelay
 	}
 
 	if c.ConnectTimeout == 0 {
-		c.ConnectTimeout = defaultConnectTimeout
+		c.ConnectTimeout = DefaultConnectTimeout
 	}
 
 	if c.RequestTimeout == 0 {
-		c.RequestTimeout = defaultRequestTimeout
+		c.RequestTimeout = DefaultRequestTimeout
 	}
 
 	if c.ConnectRetry == 0 {
-		c.ConnectRetry = defaultConnectRetry
+		c.ConnectRetry = DefaultConnectRetry
 	}
 
 	if c.RequestRetry == 0 {
-		c.RequestRetry = defaultRequestRetry
+		c.RequestRetry = DefaultRequestRetry
 	}
 
 	if c.BreakerConfig.LogLevel == "" {
@@ -90,7 +103,8 @@ func NewTransport(c Config) http.RoundTripper {
 
 	if defaultTransport, ok := http.DefaultTransport.(*http.Transport); ok {
 		t.defaultTransport = defaultTransport
-
+		// TODO configure
+		t.defaultTransport.DisableKeepAlives = true
 		t.defaultTransport.Dial = t.DialFunc
 	}
 
@@ -115,7 +129,7 @@ func (t *Transport) DialFunc(network, addr string) (net.Conn, error) {
 		conn, err = net.DialTimeout(network, addr, t.Config.ConnectTimeout)
 
 		if IsErrConnectRefused(err) {
-			time.Sleep(t.Config.ReconnectDelay)
+			time.Sleep(t.Config.ConnectRetryDelay)
 			t.logger.Info("retry connection to %s", addr)
 			continue
 		} else if err != nil {
@@ -131,12 +145,12 @@ func (t *Transport) RoundTrip(req *http.Request) (*http.Response, error) {
 	var res *http.Response
 
 	err = t.Breaker.Run(func() error {
-		for i := 0; i < int(t.Config.RequestRetry); i++ {
+		for i := 0; i <= int(t.Config.RequestRetry); i++ {
 			if i > 0 {
+				time.Sleep(t.Config.RequestRetryDelay)
 				t.logger.Info("retry request to %s", req.URL.String())
 			}
 
-			err = nil
 			res, err = t.roundTrip(req)
 			if err != nil {
 				continue
@@ -167,52 +181,38 @@ func (t *Transport) RoundTrip(req *http.Request) (*http.Response, error) {
 //------------------------------------------------------------------------------
 // private
 
+type foo struct {
+	res *http.Response
+	err error
+}
+
 func (t *Transport) roundTrip(req *http.Request) (*http.Response, error) {
-	ctx := &context{
-		req: req,
-	}
+	resChan := make(chan foo, 1)
 
-	// pre response
-	if err := t.preResHandler(ctx); err != nil {
-		ctx.Close()
-		return nil, Mask(err)
-	}
+	go func() {
+		res, err := t.defaultTransport.RoundTrip(req)
+		resChan <- foo{res: res, err: err}
+	}()
 
-	var err error
-	ctx.res, err = t.defaultTransport.RoundTrip(ctx.req)
-	if err != nil {
-		ctx.Close()
+	select {
+	case <-time.After(t.Config.RequestTimeout):
+		t.defaultTransport.CancelRequest(req)
+		t.logger.Info("request timed out: %s", req.URL.String())
 
-		if ctx.requestTimedOut {
-			return nil, Mask(ErrRequestTimeout)
+		return nil, Mask(ErrRequestTimeout)
+	case x := <-resChan:
+		if x.err != nil {
+			return nil, Mask(x.err)
 		}
 
-		return nil, Mask(err)
+		return x.res, nil
 	}
-
-	// post response
-	if err := t.postResHandler(ctx); err != nil {
-		ctx.Close()
-		return nil, Mask(err)
-	}
-
-	return ctx.res, nil
 }
 
 func (t *Transport) preResHandler(ctx *context) error {
-	ctx.timer = time.AfterFunc(t.Config.RequestTimeout, func() {
-		ctx.requestTimedOut = true
-		t.defaultTransport.CancelRequest(ctx.req)
-		t.logger.Info("request timed out: %s", ctx.req.URL.String())
-	})
-
 	return nil
 }
 
 func (t *Transport) postResHandler(ctx *context) error {
-	if ctx.requestTimedOut {
-		ctx.res.Body = &bodyCloser{ReadCloser: ctx.res.Body, timer: ctx.timer}
-	}
-
 	return nil
 }

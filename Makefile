@@ -64,7 +64,7 @@ test:
 	    -v $(shell pwd):/usr/code \
 	    -e GOPATH=/usr/code/.gobuild \
 	    -w /usr/code \
-	    golang:1.3.1-cross \
+	    golang:1.4.2-cross \
 	    go test -v $(test)
 
 fmt:

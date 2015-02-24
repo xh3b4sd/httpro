@@ -10,10 +10,15 @@ import (
 
 // Config to configure the HTTP client.
 type Config struct {
-	// ReconnectDelay describes the time the client should block before
+	// ConnectRetryDelay describes the time the client should block before
 	// attempting to connect again. This configuration is used when the
 	// preceeding connection was refused.
-	ReconnectDelay time.Duration
+	ConnectRetryDelay time.Duration
+
+	// RequestRetryDelay describes the time the client should block before
+	// attempting to try a request again. This configuration is used when the
+	// preceeding connection was failed in terms of status code 5XX or timed out.
+	RequestRetryDelay time.Duration
 
 	// ConnectTimeout is the value used to configure the call to net.DialTimeout.
 	ConnectTimeout time.Duration
@@ -43,11 +48,17 @@ type Config struct {
 // NewHTTPClient creates a new *http.Client.
 //
 //   c := httpro.NewHTTPClient(httpro.Config{
-//     ReconnectDelay: 500 * time.Millisecond,
+//     ConnectRetryDelay: 500 * time.Millisecond,
+//
 //     ConnectTimeout: 500 * time.Millisecond,
 //     RequestTimeout: 500 * time.Millisecond,
 //
+//     ConnectRetry: 5,
 //     RequestRetry: 5,
+//
+//     BreakerConfig: c.BreakerConfig,
+//
+//     LogLevel: c.LogLevel,
 //   })
 //
 //   res, err = c.Get("https://google.com/")
@@ -55,10 +66,13 @@ type Config struct {
 func NewHTTPClient(c Config) *http.Client {
 	hc := &http.Client{
 		Transport: transport.NewTransport(transport.Config{
-			ReconnectDelay: c.ReconnectDelay,
+			ConnectRetryDelay: c.ConnectRetryDelay,
+
 			ConnectTimeout: c.ConnectTimeout,
 			RequestTimeout: c.RequestTimeout,
-			RequestRetry:   c.RequestRetry,
+
+			ConnectRetry: c.ConnectRetry,
+			RequestRetry: c.RequestRetry,
 
 			BreakerConfig: c.BreakerConfig,
 
